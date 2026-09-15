@@ -30,6 +30,7 @@ class RecognitionConfig:
 @dataclass
 class TranslationConfig:
     backend: str = "google"
+    packages_dir: str | None = None
 
 
 @dataclass
@@ -126,4 +127,3 @@ def _load_section(
         unknown_text = ", ".join(sorted(str(key) for key in unknown))
         raise ValueError(f"{section_type.__name__} 包含未知字段：{unknown_text}")
     return section_type(**dict(raw))
-

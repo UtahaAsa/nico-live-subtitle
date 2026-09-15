@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Protocol
 
 
@@ -24,7 +26,15 @@ class GoogleTranslator:
 
 
 class ArgosTranslator:
-    def __init__(self) -> None:
+    def __init__(self, packages_dir: str | None = None) -> None:
+        if packages_dir:
+            resolved_packages = Path(packages_dir).resolve()
+            argos_root = resolved_packages.parent
+            os.environ["ARGOS_PACKAGES_DIR"] = str(resolved_packages)
+            os.environ.setdefault("XDG_DATA_HOME", str(argos_root / "data"))
+            os.environ.setdefault("XDG_CONFIG_HOME", str(argos_root / "config"))
+            os.environ.setdefault("XDG_CACHE_HOME", str(argos_root / "cache"))
+        os.environ.setdefault("ARGOS_DEVICE_TYPE", "cpu")
         try:
             from argostranslate import translate
         except ImportError as error:
@@ -46,12 +56,11 @@ class ArgosTranslator:
         return str(self._translation.translate(text)).strip()
 
 
-def create_translator(backend: str) -> Translator:
+def create_translator(backend: str, packages_dir: str | None = None) -> Translator:
     if backend == "none":
         return NoopTranslator()
     if backend == "google":
         return GoogleTranslator()
     if backend == "argos":
-        return ArgosTranslator()
+        return ArgosTranslator(packages_dir)
     raise ValueError(f"不支持的翻译后端：{backend}")
-

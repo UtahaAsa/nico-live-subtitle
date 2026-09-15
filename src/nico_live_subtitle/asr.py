@@ -20,8 +20,9 @@ class JapaneseRecognizer:
 
         from faster_whisper import WhisperModel
 
+        self._model_type = WhisperModel
         try:
-            self._model = WhisperModel(
+            self._model = self._model_type(
                 config.model,
                 device=runtime.device,
                 compute_type=runtime.compute_type,
@@ -30,7 +31,7 @@ class JapaneseRecognizer:
             if config.device != "auto" or runtime.device != "cuda":
                 raise
             runtime = RecognitionRuntime(device="cpu", compute_type="int8")
-            self._model = WhisperModel(
+            self._model = self._model_type(
                 config.model,
                 device=runtime.device,
                 compute_type=runtime.compute_type,
@@ -38,6 +39,23 @@ class JapaneseRecognizer:
         self.runtime = runtime
 
     def transcribe(self, samples: np.ndarray) -> str:
+        try:
+            return self._transcribe_once(samples)
+        except RuntimeError:
+            # CTranslate2 可能检测到 NVIDIA 显卡，但直到第一次推理才发现
+            # CUDA/cuDNN DLL 不完整。auto 模式在这里安全地重试 CPU；显式
+            # 选择 cuda 时仍保留原始错误，避免违背用户设置。
+            if self._config.device != "auto" or self.runtime.device != "cuda":
+                raise
+            self.runtime = RecognitionRuntime(device="cpu", compute_type="int8")
+            self._model = self._model_type(
+                self._config.model,
+                device=self.runtime.device,
+                compute_type=self.runtime.compute_type,
+            )
+            return self._transcribe_once(samples)
+
+    def _transcribe_once(self, samples: np.ndarray) -> str:
         segments, _ = self._model.transcribe(
             np.ascontiguousarray(samples, dtype=np.float32),
             language="ja",

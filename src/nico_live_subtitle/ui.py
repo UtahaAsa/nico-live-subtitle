@@ -53,6 +53,12 @@ class SettingsDialog(QtWidgets.QDialog):
         self.translation_combo.addItem("不翻译", "none")
         translation_index = self.translation_combo.findData(config.translation.backend)
         self.translation_combo.setCurrentIndex(max(0, translation_index))
+        self.argos_dir_edit = QtWidgets.QLineEdit(
+            config.translation.packages_dir or ""
+        )
+        self.argos_dir_edit.setPlaceholderText(
+            "例如 work/argos/packages；仅 Argos 模式使用"
+        )
 
         self.threshold_spin = QtWidgets.QDoubleSpinBox()
         self.threshold_spin.setRange(0.0001, 0.2)
@@ -91,6 +97,7 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("计算类型", self.compute_combo)
         form.addRow("日语热词", self.hotwords_edit)
         form.addRow("翻译方式", self.translation_combo)
+        form.addRow("Argos 模型目录", self.argos_dir_edit)
         form.addRow("语音能量阈值", self.threshold_spin)
         form.addRow("确认停顿", self.silence_spin)
         form.addRow("临时字幕间隔", self.partial_spin)
@@ -128,6 +135,9 @@ class SettingsDialog(QtWidgets.QDialog):
         self._config.recognition.compute_type = self.compute_combo.currentText()
         self._config.recognition.hotwords = self.hotwords_edit.text().strip()
         self._config.translation.backend = str(self.translation_combo.currentData())
+        self._config.translation.packages_dir = (
+            self.argos_dir_edit.text().strip() or None
+        )
         self._config.overlay.font_size = self.font_spin.value()
         self._config.overlay.opacity = self.opacity_spin.value()
         self._config.overlay.max_lines = self.lines_spin.value()

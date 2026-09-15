@@ -59,7 +59,7 @@ nico-live-subtitle --list-devices
 ## 翻译后端
 
 - `google`：默认，依赖网络，使用 `deep-translator`；第三方服务变化或网络限制可能导致翻译失败。
-- `argos`：完全离线，但需要额外安装 `argostranslate`，并由用户自行安装日语到中文语言包。
+- `argos`：完全离线，需要额外安装 `argostranslate`。当前官方索引没有日语到中文直连包，可安装日语到英语和英语到中文两个包，由 Argos 自动组合翻译；`packages_dir` 用于指定语言包目录。
 - `none`：只显示日文原文，用于离线识别或排查性能问题。
 
 在线翻译失败不会中断日语识别，状态栏会显示错误。软件不会保存音频和字幕历史。

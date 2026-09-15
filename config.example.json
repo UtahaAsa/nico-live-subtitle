@@ -17,7 +17,8 @@
     "hotwords": ""
   },
   "translation": {
-    "backend": "google"
+    "backend": "google",
+    "packages_dir": null
   },
   "overlay": {
     "font_size": 24,
@@ -27,4 +28,3 @@
     "click_through": false
   }
 }
-

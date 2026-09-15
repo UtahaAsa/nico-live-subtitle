@@ -117,11 +117,17 @@ class SubtitlePipeline(QtCore.QObject):
                 continue
             if segment is None:
                 return
+            previous_runtime = recognizer.runtime
             try:
                 text = recognizer.transcribe(segment.samples)
             except Exception as error:
                 self._emit_failure("日语识别失败", error)
                 continue
+            if recognizer.runtime != previous_runtime:
+                self.status_changed.emit(
+                    f"CUDA 不可用，已切换：{recognizer.runtime.device} / "
+                    f"{recognizer.runtime.compute_type}"
+                )
             if not text:
                 continue
 
@@ -133,7 +139,10 @@ class SubtitlePipeline(QtCore.QObject):
 
     def _translation_worker(self) -> None:
         try:
-            translator = create_translator(self._config.translation.backend)
+            translator = create_translator(
+                self._config.translation.backend,
+                self._config.translation.packages_dir,
+            )
         except Exception as error:
             if not self._stop_event.is_set():
                 self._emit_failure("翻译后端初始化失败", error)
