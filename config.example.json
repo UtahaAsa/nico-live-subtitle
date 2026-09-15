@@ -1,0 +1,30 @@
+{
+  "audio": {
+    "device": null,
+    "sample_rate": 48000,
+    "block_ms": 100,
+    "energy_threshold": 0.008,
+    "silence_ms": 650,
+    "partial_ms": 1800,
+    "max_utterance_ms": 12000,
+    "pre_roll_ms": 300
+  },
+  "recognition": {
+    "model": "small",
+    "device": "auto",
+    "compute_type": "auto",
+    "beam_size": 1,
+    "hotwords": ""
+  },
+  "translation": {
+    "backend": "google"
+  },
+  "overlay": {
+    "font_size": 24,
+    "opacity": 0.82,
+    "max_lines": 3,
+    "width": 1000,
+    "click_through": false
+  }
+}
+
