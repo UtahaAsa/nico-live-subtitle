@@ -31,6 +31,11 @@ class SettingsDialog(QtWidgets.QDialog):
         device_row.addWidget(self.device_combo, 1)
         device_row.addWidget(self.refresh_button)
 
+        self.asr_engine_combo = QtWidgets.QComboBox()
+        self.asr_engine_combo.addItem("Anime-Whisper（动画日语）", "anime_whisper")
+        self.asr_engine_combo.addItem("Faster-Whisper（通用）", "faster_whisper")
+        asr_index = self.asr_engine_combo.findData(config.recognition.engine)
+        self.asr_engine_combo.setCurrentIndex(max(0, asr_index))
         self.model_edit = QtWidgets.QLineEdit(config.recognition.model)
         self.model_edit.setPlaceholderText("例如 small，或本地 CTranslate2 模型目录")
         self.runtime_combo = QtWidgets.QComboBox()
@@ -48,7 +53,9 @@ class SettingsDialog(QtWidgets.QDialog):
         self.hotwords_edit.setPlaceholderText("作品名、角色名，用逗号或空格分隔")
 
         self.translation_combo = QtWidgets.QComboBox()
-        self.translation_combo.addItem("HY-MT 离线翻译（推荐）", "hunyuan")
+        self.translation_combo.addItem("本地动画 LLM（推荐离线）", "local_llm")
+        self.translation_combo.addItem("OpenAI 兼容接口（推荐质量）", "openai_compatible")
+        self.translation_combo.addItem("HY-MT 离线翻译（轻量）", "hunyuan")
         self.translation_combo.addItem("Google 在线翻译", "google")
         self.translation_combo.addItem("Argos 离线翻译", "argos")
         self.translation_combo.addItem("不翻译", "none")
@@ -64,13 +71,30 @@ class SettingsDialog(QtWidgets.QDialog):
             config.translation.model_path or ""
         )
         self.translation_model_edit.setPlaceholderText(
-            "HY-MT 的 .gguf 模型路径；仅 HY-MT 模式使用"
+            "本地 LLM 或 HY-MT 的 .gguf 模型路径"
         )
         self.context_lines_spin = QtWidgets.QSpinBox()
         self.context_lines_spin.setRange(0, 8)
         self.context_lines_spin.setValue(config.translation.context_lines)
         self.glossary_edit = QtWidgets.QLineEdit(config.translation.glossary)
         self.glossary_edit.setPlaceholderText("例如 スバル=昴, エミリア=爱蜜莉雅")
+        self.api_base_edit = QtWidgets.QLineEdit(config.translation.api_base)
+        self.api_base_edit.setPlaceholderText("例如 http://127.0.0.1:11434/v1")
+        self.api_model_edit = QtWidgets.QLineEdit(config.translation.api_model)
+        self.api_key_env_edit = QtWidgets.QLineEdit(config.translation.api_key_env)
+        self.api_key_env_edit.setPlaceholderText("只填写环境变量名，不填写密钥")
+
+        self.vad_combo = QtWidgets.QComboBox()
+        self.vad_combo.addItem("Silero 神经网络 VAD", "silero")
+        self.vad_combo.addItem("能量阈值 VAD", "energy")
+        vad_index = self.vad_combo.findData(config.audio.vad_mode)
+        self.vad_combo.setCurrentIndex(max(0, vad_index))
+        self.silero_model_edit = QtWidgets.QLineEdit(config.audio.silero_model or "")
+        self.silero_model_edit.setPlaceholderText("Silero VAD 的 .jit 模型路径")
+        self.vad_threshold_spin = QtWidgets.QDoubleSpinBox()
+        self.vad_threshold_spin.setRange(0.05, 0.95)
+        self.vad_threshold_spin.setSingleStep(0.05)
+        self.vad_threshold_spin.setValue(config.audio.vad_threshold)
 
         self.threshold_spin = QtWidgets.QDoubleSpinBox()
         self.threshold_spin.setRange(0.0001, 0.2)
@@ -104,6 +128,10 @@ class SettingsDialog(QtWidgets.QDialog):
 
         form = QtWidgets.QFormLayout()
         form.addRow("系统音频设备", device_row)
+        form.addRow("语音切分方式", self.vad_combo)
+        form.addRow("Silero VAD 模型", self.silero_model_edit)
+        form.addRow("VAD 语音阈值", self.vad_threshold_spin)
+        form.addRow("识别引擎", self.asr_engine_combo)
         form.addRow("Whisper 模型", self.model_edit)
         form.addRow("运行设备", self.runtime_combo)
         form.addRow("计算类型", self.compute_combo)
@@ -112,6 +140,9 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("HY-MT 模型", self.translation_model_edit)
         form.addRow("参考前文句数", self.context_lines_spin)
         form.addRow("翻译术语表", self.glossary_edit)
+        form.addRow("兼容接口地址", self.api_base_edit)
+        form.addRow("兼容接口模型", self.api_model_edit)
+        form.addRow("密钥环境变量名", self.api_key_env_edit)
         form.addRow("Argos 模型目录", self.argos_dir_edit)
         form.addRow("语音能量阈值", self.threshold_spin)
         form.addRow("确认停顿", self.silence_spin)
@@ -142,9 +173,18 @@ class SettingsDialog(QtWidgets.QDialog):
 
     def apply(self) -> None:
         self._config.audio.device = self.device_combo.currentData()
+        self._config.audio.vad_mode = str(self.vad_combo.currentData())
+        self._config.audio.block_ms = (
+            32 if self._config.audio.vad_mode == "silero" else 100
+        )
+        self._config.audio.silero_model = (
+            self.silero_model_edit.text().strip() or None
+        )
+        self._config.audio.vad_threshold = self.vad_threshold_spin.value()
         self._config.audio.energy_threshold = self.threshold_spin.value()
         self._config.audio.silence_ms = self.silence_spin.value()
         self._config.audio.partial_ms = self.partial_spin.value()
+        self._config.recognition.engine = str(self.asr_engine_combo.currentData())
         self._config.recognition.model = self.model_edit.text().strip()
         self._config.recognition.device = self.runtime_combo.currentText()
         self._config.recognition.compute_type = self.compute_combo.currentText()
@@ -158,6 +198,9 @@ class SettingsDialog(QtWidgets.QDialog):
         )
         self._config.translation.context_lines = self.context_lines_spin.value()
         self._config.translation.glossary = self.glossary_edit.text().strip()
+        self._config.translation.api_base = self.api_base_edit.text().strip()
+        self._config.translation.api_model = self.api_model_edit.text().strip()
+        self._config.translation.api_key_env = self.api_key_env_edit.text().strip()
         self._config.overlay.font_size = self.font_spin.value()
         self._config.overlay.opacity = self.opacity_spin.value()
         self._config.overlay.max_lines = self.lines_spin.value()
@@ -187,10 +230,16 @@ class SettingsDialog(QtWidgets.QDialog):
             QtWidgets.QMessageBox.warning(self, "设置错误", "请先选择有效音频设备")
             return
         if (
-            self.translation_combo.currentData() == "hunyuan"
+            self.translation_combo.currentData() in {"hunyuan", "local_llm"}
             and not self.translation_model_edit.text().strip()
         ):
-            QtWidgets.QMessageBox.warning(self, "设置错误", "HY-MT 模型路径不能为空")
+            QtWidgets.QMessageBox.warning(self, "设置错误", "本地翻译模型路径不能为空")
+            return
+        if (
+            self.vad_combo.currentData() == "silero"
+            and not self.silero_model_edit.text().strip()
+        ):
+            QtWidgets.QMessageBox.warning(self, "设置错误", "Silero VAD 模型路径不能为空")
             return
         try:
             self.apply()

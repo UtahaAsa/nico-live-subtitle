@@ -52,7 +52,37 @@ class SpeechSegmenterTest(unittest.TestCase):
         self.assertTrue(final.is_final)
         self.assertIsNone(segmenter.flush())
 
+    def test_probability_provider_controls_segmentation(self) -> None:
+        class FakeProbability:
+            def __init__(self) -> None:
+                self.values = iter([0.1, 0.9, 0.9, 0.1, 0.1])
+
+            def score(self, samples: np.ndarray) -> float:
+                return next(self.values)
+
+        self.config.vad_threshold = 0.5
+        segmenter = SpeechSegmenter(
+            self.config,
+            sample_rate=1_000,
+            speech_probability=FakeProbability(),
+        )
+        events = []
+        for _ in range(5):
+            events.extend(segmenter.push(self.speech))
+        self.assertTrue(events[-1].is_final)
+
+    def test_pre_roll_silence_does_not_count_as_speech(self) -> None:
+        self.config.min_speech_ms = 200
+        segmenter = SpeechSegmenter(self.config, sample_rate=1_000)
+
+        self.assertEqual([], segmenter.push(self.silence))
+        self.assertEqual([], segmenter.push(self.speech))
+        partial = segmenter.push(self.silence)
+        self.assertEqual(1, len(partial))
+        self.assertFalse(partial[0].is_final)
+        self.assertEqual([], segmenter.push(self.silence))
+        self.assertFalse(segmenter.active)
+
 
 if __name__ == "__main__":
     unittest.main()
-

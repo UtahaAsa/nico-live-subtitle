@@ -8,10 +8,11 @@ from dataclasses import dataclass
 
 from PySide6 import QtCore
 
-from .asr import JapaneseRecognizer
+from .asr import create_recognizer
 from .audio import SystemAudioCapture
 from .config import AppConfig
 from .segmenter import AudioSegment, SpeechSegmenter
+from .text import TranscriptStabilizer
 from .translation import create_translator
 
 
@@ -99,7 +100,7 @@ class SubtitlePipeline(QtCore.QObject):
     def _asr_worker(self) -> None:
         try:
             self.status_changed.emit("正在加载语音模型…")
-            recognizer = JapaneseRecognizer(self._config.recognition)
+            recognizer = create_recognizer(self._config.recognition)
             if self._stop_event.is_set():
                 return
             self.status_changed.emit(
@@ -111,6 +112,9 @@ class SubtitlePipeline(QtCore.QObject):
                 self._emit_failure("语音模型加载失败", error)
             return
 
+        stabilizers: dict[int, TranscriptStabilizer] = {}
+        pending_ids: dict[int, int] = {}
+        next_display_id = 0
         while not self._stop_event.is_set():
             try:
                 segment = self._asr_queue.get(timeout=0.2)
@@ -129,14 +133,37 @@ class SubtitlePipeline(QtCore.QObject):
                     f"CUDA 不可用，已切换：{recognizer.runtime.device} / "
                     f"{recognizer.runtime.compute_type}"
                 )
-            if not text:
+            if not text or not any(character.isalnum() for character in text):
                 continue
 
-            update = TranscriptUpdate(segment.utterance_id, text, segment.is_final)
-            self.transcript_ready.emit(update)
-            self._enqueue_translation(
-                TranslationJob(segment.utterance_id, text, segment.is_final)
+            stabilizer = stabilizers.setdefault(
+                segment.utterance_id, TranscriptStabilizer()
             )
+            complete, pending = stabilizer.push(text, segment.is_final)
+            for sentence in complete:
+                display_id = pending_ids.pop(segment.utterance_id, None)
+                if display_id is None:
+                    next_display_id += 1
+                    display_id = next_display_id
+                self.transcript_ready.emit(
+                    TranscriptUpdate(display_id, sentence, True)
+                )
+                if self._config.translation.backend != "none":
+                    self._enqueue_translation(
+                        TranslationJob(display_id, sentence, True)
+                    )
+            if pending and not segment.is_final:
+                display_id = pending_ids.get(segment.utterance_id)
+                if display_id is None:
+                    next_display_id += 1
+                    display_id = next_display_id
+                    pending_ids[segment.utterance_id] = display_id
+                self.transcript_ready.emit(
+                    TranscriptUpdate(display_id, pending, False)
+                )
+            if segment.is_final:
+                stabilizers.pop(segment.utterance_id, None)
+                pending_ids.pop(segment.utterance_id, None)
 
     def _translation_worker(self) -> None:
         try:
@@ -146,13 +173,26 @@ class SubtitlePipeline(QtCore.QObject):
                 self._config.translation.model_path,
                 self._config.translation.glossary,
                 self._config.translation.n_gpu_layers,
+                self._config.translation.api_base,
+                self._config.translation.api_model,
+                self._config.translation.api_key_env,
+                self._config.translation.timeout_sec,
             )
+            if self._stop_event.is_set():
+                return
+            warmup = getattr(translator, "warmup", None)
+            if callable(warmup):
+                self.status_changed.emit("正在预热本地翻译模型…")
+                warmup()
+                if self._stop_event.is_set():
+                    return
+                self.status_changed.emit("本地翻译模型就绪")
         except Exception as error:
             if not self._stop_event.is_set():
                 self._emit_failure("翻译后端初始化失败", error)
             return
 
-        context: deque[str] = deque(
+        context: deque[tuple[str, str]] = deque(
             maxlen=self._config.translation.context_lines or None
         )
         while not self._stop_event.is_set():
@@ -163,19 +203,38 @@ class SubtitlePipeline(QtCore.QObject):
             if job is None:
                 return
             try:
-                translated = translator.translate(job.text, tuple(context))
+                translate_iter = getattr(translator, "translate_iter", None)
+                if callable(translate_iter):
+                    results = translate_iter(job.text, tuple(context))
+                else:
+                    results = iter([translator.translate(job.text, tuple(context))])
+                previous = ""
+                for translated in results:
+                    translated = str(translated).strip()
+                    if not translated or translated == previous:
+                        continue
+                    if previous:
+                        self.translation_ready.emit(
+                            TranslationUpdate(
+                                job.utterance_id,
+                                job.text,
+                                previous,
+                                False,
+                            )
+                        )
+                    previous = translated
+                if not previous:
+                    raise RuntimeError("翻译后端返回了空结果")
             except Exception as error:
                 self._emit_failure("翻译失败，日语识别仍会继续", error)
-                if job.is_final and self._config.translation.context_lines:
-                    context.append(job.text)
                 continue
             self.translation_ready.emit(
                 TranslationUpdate(
-                    job.utterance_id, job.text, translated, job.is_final
+                    job.utterance_id, job.text, previous, job.is_final
                 )
             )
             if job.is_final and self._config.translation.context_lines:
-                context.append(job.text)
+                context.append((job.text, previous))
 
     def _enqueue_asr(self, segment: AudioSegment) -> None:
         if segment.is_final:

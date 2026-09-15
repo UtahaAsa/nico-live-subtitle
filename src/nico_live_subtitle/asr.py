@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 
@@ -11,6 +12,12 @@ from .config import RecognitionConfig
 class RecognitionRuntime:
     device: str
     compute_type: str
+
+
+class Recognizer(Protocol):
+    runtime: RecognitionRuntime
+
+    def transcribe(self, samples: np.ndarray) -> str: ...
 
 
 class JapaneseRecognizer:
@@ -67,6 +74,65 @@ class JapaneseRecognizer:
         )
         parts = [segment.text.strip() for segment in segments if segment.text.strip()]
         return "".join(parts)
+
+
+class AnimeWhisperRecognizer:
+    """使用针对动画演技日语微调的 Whisper 模型识别台词。"""
+
+    def __init__(self, config: RecognitionConfig) -> None:
+        import torch
+        from transformers import pipeline
+
+        device = config.device
+        if device == "auto":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        dtype = torch.float16 if device == "cuda" else torch.float32
+        try:
+            self._pipeline = pipeline(
+                "automatic-speech-recognition",
+                model=config.model,
+                device=device,
+                dtype=dtype,
+                batch_size=1,
+            )
+        except Exception:
+            if config.device != "auto" or device != "cuda":
+                raise
+            device = "cpu"
+            dtype = torch.float32
+            self._pipeline = pipeline(
+                "automatic-speech-recognition",
+                model=config.model,
+                device=device,
+                dtype=dtype,
+                batch_size=1,
+            )
+        self.runtime = RecognitionRuntime(
+            device=device,
+            compute_type="float16" if device == "cuda" else "float32",
+        )
+
+    def transcribe(self, samples: np.ndarray) -> str:
+        result = self._pipeline(
+            np.ascontiguousarray(samples, dtype=np.float32),
+            generate_kwargs={
+                "language": "Japanese",
+                "task": "transcribe",
+                "do_sample": False,
+                "num_beams": 1,
+                "no_repeat_ngram_size": 5,
+                "repetition_penalty": 1.0,
+            },
+        )
+        return str((result or {}).get("text", "")).strip()
+
+
+def create_recognizer(config: RecognitionConfig) -> Recognizer:
+    if config.engine == "anime_whisper":
+        return AnimeWhisperRecognizer(config)
+    if config.engine == "faster_whisper":
+        return JapaneseRecognizer(config)
+    raise ValueError(f"不支持的识别后端：{config.engine}")
 
 
 def resolve_runtime(config: RecognitionConfig) -> RecognitionRuntime:

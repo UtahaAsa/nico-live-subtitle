@@ -3,13 +3,18 @@
     "device": null,
     "sample_rate": 48000,
     "block_ms": 100,
+    "vad_mode": "energy",
+    "vad_threshold": 0.5,
+    "silero_model": null,
     "energy_threshold": 0.008,
+    "min_speech_ms": 160,
     "silence_ms": 650,
     "partial_ms": 1800,
     "max_utterance_ms": 12000,
     "pre_roll_ms": 300
   },
   "recognition": {
+    "engine": "faster_whisper",
     "model": "small",
     "device": "auto",
     "compute_type": "auto",
@@ -22,7 +27,11 @@
     "model_path": null,
     "context_lines": 2,
     "glossary": "",
-    "n_gpu_layers": -1
+    "n_gpu_layers": -1,
+    "api_base": "http://127.0.0.1:11434/v1",
+    "api_model": "qwen3:8b",
+    "api_key_env": "NICO_SUBTITLE_API_KEY",
+    "timeout_sec": 20
   },
   "overlay": {
     "font_size": 24,

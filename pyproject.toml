@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nico-live-subtitle"
-version = "0.1.0"
+version = "0.2.0"
 description = "Windows system-audio Japanese subtitles with Chinese translation overlay"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,6 +30,8 @@ dependencies = [
 [project.optional-dependencies]
 local-translate = ["argostranslate>=1.9,<2"]
 local-llm = ["llama-cpp-python>=0.3.16,<0.4"]
+anime-asr = ["torch>=2.11,<3", "transformers>=5,<6"]
+llm-api = ["openai>=2,<3"]
 test = ["pytest>=8,<9"]
 
 [project.scripts]

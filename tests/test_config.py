@@ -51,6 +51,12 @@ class AppConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "context_lines"):
             config.validate()
 
+    def test_silero_requires_32_ms_blocks(self) -> None:
+        config = AppConfig()
+        config.audio.vad_mode = "silero"
+        with self.assertRaisesRegex(ValueError, "32"):
+            config.validate()
+
 
 if __name__ == "__main__":
     unittest.main()
