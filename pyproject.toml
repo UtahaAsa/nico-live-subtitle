@@ -29,6 +29,7 @@ dependencies = [
 
 [project.optional-dependencies]
 local-translate = ["argostranslate>=1.9,<2"]
+local-llm = ["llama-cpp-python>=0.3.16,<0.4"]
 test = ["pytest>=8,<9"]
 
 [project.scripts]

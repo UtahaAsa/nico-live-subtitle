@@ -31,6 +31,10 @@ class RecognitionConfig:
 class TranslationConfig:
     backend: str = "google"
     packages_dir: str | None = None
+    model_path: str | None = None
+    context_lines: int = 2
+    glossary: str = ""
+    n_gpu_layers: int = -1
 
 
 @dataclass
@@ -94,8 +98,15 @@ class AppConfig:
         if recognition.beam_size < 1:
             raise ValueError("recognition.beam_size 必须大于等于 1")
 
-        if self.translation.backend not in {"google", "argos", "none"}:
-            raise ValueError("translation.backend 只能是 google、argos 或 none")
+        translation = self.translation
+        if translation.backend not in {"google", "argos", "hunyuan", "none"}:
+            raise ValueError(
+                "translation.backend 只能是 google、argos、hunyuan 或 none"
+            )
+        if not 0 <= translation.context_lines <= 8:
+            raise ValueError("translation.context_lines 必须在 0 到 8 之间")
+        if translation.n_gpu_layers < -1:
+            raise ValueError("translation.n_gpu_layers 不能小于 -1")
 
         overlay = self.overlay
         if not 12 <= overlay.font_size <= 72:

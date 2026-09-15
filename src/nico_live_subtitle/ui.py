@@ -48,6 +48,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.hotwords_edit.setPlaceholderText("作品名、角色名，用逗号或空格分隔")
 
         self.translation_combo = QtWidgets.QComboBox()
+        self.translation_combo.addItem("HY-MT 离线翻译（推荐）", "hunyuan")
         self.translation_combo.addItem("Google 在线翻译", "google")
         self.translation_combo.addItem("Argos 离线翻译", "argos")
         self.translation_combo.addItem("不翻译", "none")
@@ -59,6 +60,17 @@ class SettingsDialog(QtWidgets.QDialog):
         self.argos_dir_edit.setPlaceholderText(
             "例如 work/argos/packages；仅 Argos 模式使用"
         )
+        self.translation_model_edit = QtWidgets.QLineEdit(
+            config.translation.model_path or ""
+        )
+        self.translation_model_edit.setPlaceholderText(
+            "HY-MT 的 .gguf 模型路径；仅 HY-MT 模式使用"
+        )
+        self.context_lines_spin = QtWidgets.QSpinBox()
+        self.context_lines_spin.setRange(0, 8)
+        self.context_lines_spin.setValue(config.translation.context_lines)
+        self.glossary_edit = QtWidgets.QLineEdit(config.translation.glossary)
+        self.glossary_edit.setPlaceholderText("例如 スバル=昴, エミリア=爱蜜莉雅")
 
         self.threshold_spin = QtWidgets.QDoubleSpinBox()
         self.threshold_spin.setRange(0.0001, 0.2)
@@ -97,6 +109,9 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("计算类型", self.compute_combo)
         form.addRow("日语热词", self.hotwords_edit)
         form.addRow("翻译方式", self.translation_combo)
+        form.addRow("HY-MT 模型", self.translation_model_edit)
+        form.addRow("参考前文句数", self.context_lines_spin)
+        form.addRow("翻译术语表", self.glossary_edit)
         form.addRow("Argos 模型目录", self.argos_dir_edit)
         form.addRow("语音能量阈值", self.threshold_spin)
         form.addRow("确认停顿", self.silence_spin)
@@ -138,6 +153,11 @@ class SettingsDialog(QtWidgets.QDialog):
         self._config.translation.packages_dir = (
             self.argos_dir_edit.text().strip() or None
         )
+        self._config.translation.model_path = (
+            self.translation_model_edit.text().strip() or None
+        )
+        self._config.translation.context_lines = self.context_lines_spin.value()
+        self._config.translation.glossary = self.glossary_edit.text().strip()
         self._config.overlay.font_size = self.font_spin.value()
         self._config.overlay.opacity = self.opacity_spin.value()
         self._config.overlay.max_lines = self.lines_spin.value()
@@ -165,6 +185,12 @@ class SettingsDialog(QtWidgets.QDialog):
             return
         if self.device_combo.currentData() == "":
             QtWidgets.QMessageBox.warning(self, "设置错误", "请先选择有效音频设备")
+            return
+        if (
+            self.translation_combo.currentData() == "hunyuan"
+            and not self.translation_model_edit.text().strip()
+        ):
+            QtWidgets.QMessageBox.warning(self, "设置错误", "HY-MT 模型路径不能为空")
             return
         try:
             self.apply()

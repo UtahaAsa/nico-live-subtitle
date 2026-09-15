@@ -38,6 +38,19 @@ class AppConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "max_utterance_ms"):
             config.validate()
 
+    def test_hunyuan_translation_config_is_valid(self) -> None:
+        config = AppConfig()
+        config.translation.backend = "hunyuan"
+        config.translation.model_path = "model.gguf"
+        config.translation.context_lines = 3
+        config.validate()
+
+    def test_invalid_translation_context_is_rejected(self) -> None:
+        config = AppConfig()
+        config.translation.context_lines = 9
+        with self.assertRaisesRegex(ValueError, "context_lines"):
+            config.validate()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import queue
 import threading
 import traceback
+from collections import deque
 from dataclasses import dataclass
 
 from PySide6 import QtCore
@@ -142,12 +143,18 @@ class SubtitlePipeline(QtCore.QObject):
             translator = create_translator(
                 self._config.translation.backend,
                 self._config.translation.packages_dir,
+                self._config.translation.model_path,
+                self._config.translation.glossary,
+                self._config.translation.n_gpu_layers,
             )
         except Exception as error:
             if not self._stop_event.is_set():
                 self._emit_failure("翻译后端初始化失败", error)
             return
 
+        context: deque[str] = deque(
+            maxlen=self._config.translation.context_lines or None
+        )
         while not self._stop_event.is_set():
             try:
                 job = self._translation_queue.get(timeout=0.2)
@@ -156,15 +163,19 @@ class SubtitlePipeline(QtCore.QObject):
             if job is None:
                 return
             try:
-                translated = translator.translate(job.text)
+                translated = translator.translate(job.text, tuple(context))
             except Exception as error:
                 self._emit_failure("翻译失败，日语识别仍会继续", error)
+                if job.is_final and self._config.translation.context_lines:
+                    context.append(job.text)
                 continue
             self.translation_ready.emit(
                 TranslationUpdate(
                     job.utterance_id, job.text, translated, job.is_final
                 )
             )
+            if job.is_final and self._config.translation.context_lines:
+                context.append(job.text)
 
     def _enqueue_asr(self, segment: AudioSegment) -> None:
         if segment.is_final:

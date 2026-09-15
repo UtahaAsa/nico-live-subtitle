@@ -18,7 +18,11 @@
   },
   "translation": {
     "backend": "google",
-    "packages_dir": null
+    "packages_dir": null,
+    "model_path": null,
+    "context_lines": 2,
+    "glossary": "",
+    "n_gpu_layers": -1
   },
   "overlay": {
     "font_size": 24,
