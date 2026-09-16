@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "mushoku-tensei",
+  "title": "无职转生",
+  "aliases": ["無職転生", "無職転生 ～異世界行ったら本気だす～"],
+  "hotwords": [],
+  "source_urls": ["https://mushokutensei.jp/character/"],
+  "terms": [
+    {"source": ["ルーデウス・グレイラット", "ルーデウス"], "target": "鲁迪乌斯"},
+    {"source": ["ロキシー・ミグルディア", "ロキシー"], "target": "洛琪希"},
+    {"source": ["シルフィエット", "シルフィ"], "target": "希露菲叶特"},
+    {"source": ["エリス・ボレアス・グレイラット", "エリス"], "target": "艾莉丝"},
+    {"source": "ノルン・グレイラット", "target": "诺伦·格雷拉特"},
+    {"source": "アイシャ・グレイラット", "target": "爱夏·格雷拉特"},
+    {"source": "パウロ・グレイラット", "target": "保罗·格雷拉特"},
+    {"source": "ゼニス・グレイラット", "target": "塞妮丝·格雷拉特"},
+    {"source": "リーリャ・グレイラット", "target": "莉莉雅·格雷拉特"},
+    {"source": ["ルイジェルド・スペルディア", "ルイジェルド"], "target": "瑞杰路德"},
+    {"source": "オルステッド", "target": "奥尔斯帝德"},
+    {"source": ["ナナホシ・シズカ", "七星静香"], "target": "七星静香"},
+    {"source": "ヒトガミ", "target": "人神"},
+    {"source": "ラプラス", "target": "拉普拉斯"},
+    {"source": "アスラ王国", "target": "阿斯拉王国"},
+    {"source": "魔大陸", "target": "魔大陆"},
+    {"source": "フィットア領", "target": "菲托亚领"},
+    {"source": "転移事件", "target": "转移事件"},
+    {"source": "無詠唱", "target": "无咏唱"},
+    {"source": "龍神", "target": "龙神"}
+  ]
+}

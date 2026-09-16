@@ -7,7 +7,7 @@ from PySide6 import QtWidgets
 
 from nico_live_subtitle.config import AppConfig
 from nico_live_subtitle.pipeline import TranscriptUpdate, TranslationUpdate
-from nico_live_subtitle.ui import OverlayWindow
+from nico_live_subtitle.ui import OverlayWindow, SettingsDialog
 
 
 class OverlayWindowTest(unittest.TestCase):
@@ -36,6 +36,15 @@ class OverlayWindowTest(unittest.TestCase):
         self.assertGreater(resized.height(), original.height())
         self.assertEqual(anchor, (resized.center().x(), resized.bottom()))
         window.close()
+
+    def test_settings_selects_anime_lexicon_profile(self) -> None:
+        config = AppConfig()
+        config.lexicon.profile = "re-zero"
+        dialog = SettingsDialog(config)
+
+        self.assertEqual("re-zero", dialog.lexicon_combo.currentData())
+        self.assertIn("本作品", dialog.lexicon_info_label.text())
+        dialog.close()
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ Windows 桌面实时字幕 MVP：捕获默认播放设备的系统音频，识�
 - 仅翻译已经稳定的完整句，避免临时识别结果反复改写译文
 - 本地 Qwen、OpenAI 兼容接口、HY-MT、Google、Argos 多种翻译后端
 - LLM 流式翻译、日中成对上下文和动画专用提示词
+- 可搜索的作品词库包，自动叠加角色名、地名、招式和固定译名
 - 透明置顶悬浮窗、字号/透明度调整、点击穿透
 - 音频设备枚举、自定义 Whisper 模型路径、日语热词
 
@@ -68,6 +69,35 @@ New-Item -ItemType Directory -Force work/models/silero-vad
 Invoke-WebRequest https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad.jit -OutFile work/models/silero-vad/silero_vad.jit
 ```
 
+## 作品词库
+
+设置中的“作品词库”代替了不断增长的单行热词和术语表。程序始终加载 `anime-common` 通用词库，再叠加当前选择的一部作品；“自定义热词”和“自定义术语”只用于少量个人修正，并且自定义译名优先于内置译名。
+
+当前内置：
+
+- Re:从零开始的异世界生活
+- BLEACH 千年血战篇
+- 无职转生
+- 葬送的芙莉莲
+- 药屋少女的呢喃
+
+词库位于 `lexicons/`，每部作品一个 JSON 文件。新增作品不需要修改 Python 代码，复制下面的格式后在设置中点击“刷新词库”即可：
+
+```json
+{
+  "schema_version": 1,
+  "id": "example-anime",
+  "title": "示例动画",
+  "aliases": ["作品日文标题"],
+  "hotwords": ["只需识别、不需要固定翻译的词"],
+  "terms": [
+    {"source": ["角色全名", "角色昵称"], "target": "简体中文固定译名"}
+  ]
+}
+```
+
+Anime-Whisper 不直接接收热词，作品词库会进入 LLM 提示词，用于修正明显的名字识别错误并统一译名；选择 Faster-Whisper 时，同一批日文词还会自动作为 ASR 热词。不同地区的官方译名可能不一致，可在“自定义术语”中覆盖，格式仍为 `日文=中文`。
+
 ## 翻译后端
 
 - `local_llm`：使用本地 GGUF 通用 LLM 和动画字幕提示词，支持流式输出、术语表以及最近几组日中译文上下文。
@@ -94,7 +124,7 @@ python -c "from huggingface_hub import hf_hub_download; hf_hub_download('Qwen/Qw
 work/models/qwen3-4b/Qwen3-4B-Q4_K_M.gguf
 ```
 
-`context_lines` 控制携带多少组历史日文及其中文译文；`glossary` 格式为 `日文=中文, 日文=中文`；`n_gpu_layers=-1` 表示尽量把全部层放到 GPU。Qwen3 和 Anime-Whisper 均使用 MIT/Apache-2.0 兼容的开放许可，但模型权重仍不包含在本仓库中。
+`context_lines` 控制携带多少组历史日文及其中文译文；`n_gpu_layers=-1` 表示尽量把全部层放到 GPU。Qwen3 和 Anime-Whisper 均使用 MIT/Apache-2.0 兼容的开放许可，但模型权重仍不包含在本仓库中。
 
 HY-MT 仍作为兼容后端保留。它采用独立的 Tencent HY Community License，许可地域不包括欧盟、英国和韩国；使用前请阅读[模型仓库的完整许可](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/blob/main/License.txt)。
 

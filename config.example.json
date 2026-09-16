@@ -33,6 +33,11 @@
     "api_key_env": "NICO_SUBTITLE_API_KEY",
     "timeout_sec": 20
   },
+  "lexicon": {
+    "directory": "lexicons",
+    "profile": "",
+    "include_common": true
+  },
   "overlay": {
     "font_size": 24,
     "opacity": 0.82,

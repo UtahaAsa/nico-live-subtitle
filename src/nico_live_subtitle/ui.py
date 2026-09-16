@@ -7,6 +7,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from .audio import LoopbackDevice, list_loopback_devices
 from .config import AppConfig
+from .lexicon import AnimeLexicon, load_lexicon_catalog
 from .pipeline import SubtitlePipeline, TranscriptUpdate, TranslationUpdate
 
 
@@ -50,7 +51,29 @@ class SettingsDialog(QtWidgets.QDialog):
             self.compute_combo.addItem(config.recognition.compute_type)
         self.compute_combo.setCurrentText(config.recognition.compute_type)
         self.hotwords_edit = QtWidgets.QLineEdit(config.recognition.hotwords)
-        self.hotwords_edit.setPlaceholderText("作品名、角色名，用逗号或空格分隔")
+        self.hotwords_edit.setPlaceholderText("只填写词库中没有的名字，用空格分隔")
+        self.hotwords_edit.setToolTip(
+            "Faster-Whisper 会直接使用；Anime-Whisper 中由翻译模型结合词库纠错"
+        )
+
+        self._lexicons: dict[str, AnimeLexicon] = {}
+        self.lexicon_combo = QtWidgets.QComboBox()
+        self.lexicon_combo.setEditable(True)
+        self.lexicon_combo.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.NoInsert)
+        self.lexicon_combo.setMaxVisibleItems(16)
+        completer = self.lexicon_combo.completer()
+        if completer is not None:
+            completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
+            completer.setCompletionMode(
+                QtWidgets.QCompleter.CompletionMode.PopupCompletion
+            )
+        self.lexicon_refresh_button = QtWidgets.QPushButton("刷新词库")
+        lexicon_row = QtWidgets.QHBoxLayout()
+        lexicon_row.addWidget(self.lexicon_combo, 1)
+        lexicon_row.addWidget(self.lexicon_refresh_button)
+        self.lexicon_info_label = QtWidgets.QLabel()
+        self.lexicon_info_label.setWordWrap(True)
+        self.lexicon_info_label.setStyleSheet("color: #666;")
 
         self.translation_combo = QtWidgets.QComboBox()
         self.translation_combo.addItem("本地动画 LLM（推荐离线）", "local_llm")
@@ -77,7 +100,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.context_lines_spin.setRange(0, 8)
         self.context_lines_spin.setValue(config.translation.context_lines)
         self.glossary_edit = QtWidgets.QLineEdit(config.translation.glossary)
-        self.glossary_edit.setPlaceholderText("例如 スバル=昴, エミリア=爱蜜莉雅")
+        self.glossary_edit.setPlaceholderText("只填写个人修正，例如 昵称=固定译名")
         self.api_base_edit = QtWidgets.QLineEdit(config.translation.api_base)
         self.api_base_edit.setPlaceholderText("例如 http://127.0.0.1:11434/v1")
         self.api_model_edit = QtWidgets.QLineEdit(config.translation.api_model)
@@ -132,14 +155,16 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("Silero VAD 模型", self.silero_model_edit)
         form.addRow("VAD 语音阈值", self.vad_threshold_spin)
         form.addRow("识别引擎", self.asr_engine_combo)
-        form.addRow("Whisper 模型", self.model_edit)
+        form.addRow("语音模型", self.model_edit)
         form.addRow("运行设备", self.runtime_combo)
         form.addRow("计算类型", self.compute_combo)
-        form.addRow("日语热词", self.hotwords_edit)
+        form.addRow("作品词库", lexicon_row)
+        form.addRow("词库内容", self.lexicon_info_label)
+        form.addRow("自定义热词", self.hotwords_edit)
         form.addRow("翻译方式", self.translation_combo)
-        form.addRow("HY-MT 模型", self.translation_model_edit)
+        form.addRow("本地翻译模型", self.translation_model_edit)
         form.addRow("参考前文句数", self.context_lines_spin)
-        form.addRow("翻译术语表", self.glossary_edit)
+        form.addRow("自定义术语", self.glossary_edit)
         form.addRow("兼容接口地址", self.api_base_edit)
         form.addRow("兼容接口模型", self.api_model_edit)
         form.addRow("密钥环境变量名", self.api_key_env_edit)
@@ -164,11 +189,14 @@ class SettingsDialog(QtWidgets.QDialog):
         buttons.accepted.connect(self._validate_and_accept)
         buttons.rejected.connect(self.reject)
         self.refresh_button.clicked.connect(self._refresh_devices)
+        self.lexicon_refresh_button.clicked.connect(self._refresh_lexicons)
+        self.lexicon_combo.currentIndexChanged.connect(self._update_lexicon_info)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(hint)
         layout.addWidget(buttons)
+        self._refresh_lexicons()
         self._refresh_devices()
 
     def apply(self) -> None:
@@ -189,6 +217,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self._config.recognition.device = self.runtime_combo.currentText()
         self._config.recognition.compute_type = self.compute_combo.currentText()
         self._config.recognition.hotwords = self.hotwords_edit.text().strip()
+        self._config.lexicon.profile = str(self.lexicon_combo.currentData() or "")
         self._config.translation.backend = str(self.translation_combo.currentData())
         self._config.translation.packages_dir = (
             self.argos_dir_edit.text().strip() or None
@@ -222,6 +251,47 @@ class SettingsDialog(QtWidgets.QDialog):
         index = self.device_combo.findData(selected)
         self.device_combo.setCurrentIndex(max(0, index))
 
+    def _refresh_lexicons(self) -> None:
+        selected = (
+            self.lexicon_combo.currentData()
+            if self.lexicon_combo.count()
+            else self._config.lexicon.profile
+        )
+        self.lexicon_combo.clear()
+        self._lexicons = {}
+        self.lexicon_combo.addItem("通用动画词库", "")
+        try:
+            catalog = load_lexicon_catalog(self._config.lexicon.directory)
+        except ValueError as error:
+            self.lexicon_combo.addItem(f"读取失败：{error}", None)
+            self._update_lexicon_info()
+            return
+        self._lexicons = {item.id: item for item in catalog}
+        for lexicon in catalog:
+            if lexicon.id == "anime-common":
+                continue
+            self.lexicon_combo.addItem(lexicon.title, lexicon.id)
+        index = self.lexicon_combo.findData(selected or "")
+        if index < 0 and selected:
+            self.lexicon_combo.addItem(f"找不到：{selected}", None)
+            index = self.lexicon_combo.count() - 1
+        self.lexicon_combo.setCurrentIndex(max(0, index))
+        self._update_lexicon_info()
+
+    def _update_lexicon_info(self) -> None:
+        common = self._lexicons.get("anime-common")
+        common_count = len(common.terms) if common is not None else 0
+        profile_id = self.lexicon_combo.currentData()
+        profile = self._lexicons.get(str(profile_id)) if profile_id else None
+        profile_count = len(profile.terms) if profile is not None else 0
+        if profile_id is None and self.lexicon_combo.currentIndex() > 0:
+            self.lexicon_info_label.setText("词库不可用，请刷新或重新选择")
+            return
+        self.lexicon_info_label.setText(
+            f"自动叠加通用 {common_count} 条 + 本作品 {profile_count} 条；"
+            "输入框只用于个人补充"
+        )
+
     def _validate_and_accept(self) -> None:
         if not self.model_edit.text().strip():
             QtWidgets.QMessageBox.warning(self, "设置错误", "Whisper 模型不能为空")
@@ -229,6 +299,13 @@ class SettingsDialog(QtWidgets.QDialog):
         if self.device_combo.currentData() == "":
             QtWidgets.QMessageBox.warning(self, "设置错误", "请先选择有效音频设备")
             return
+        lexicon_index = self.lexicon_combo.findText(
+            self.lexicon_combo.currentText(), QtCore.Qt.MatchFlag.MatchFixedString
+        )
+        if lexicon_index < 0 or self.lexicon_combo.itemData(lexicon_index) is None:
+            QtWidgets.QMessageBox.warning(self, "设置错误", "请选择有效的作品词库")
+            return
+        self.lexicon_combo.setCurrentIndex(lexicon_index)
         if (
             self.translation_combo.currentData() in {"hunyuan", "local_llm"}
             and not self.translation_model_edit.text().strip()

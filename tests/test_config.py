@@ -57,6 +57,12 @@ class AppConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "32"):
             config.validate()
 
+    def test_lexicon_profile_uses_safe_identifier(self) -> None:
+        config = AppConfig()
+        config.lexicon.profile = "../outside"
+        with self.assertRaisesRegex(ValueError, "lexicon.profile"):
+            config.validate()
+
 
 if __name__ == "__main__":
     unittest.main()

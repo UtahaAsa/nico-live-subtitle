@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "anime-common",
+  "title": "通用动画词库",
+  "aliases": ["アニメ"],
+  "hotwords": [],
+  "terms": [
+    {"source": ["先輩", "せんぱい"], "target": "前辈"},
+    {"source": ["後輩", "こうはい"], "target": "后辈"},
+    {"source": ["お兄ちゃん", "兄様"], "target": "哥哥"},
+    {"source": ["お姉ちゃん", "姉様"], "target": "姐姐"},
+    {"source": "先生", "target": "老师"},
+    {"source": "師匠", "target": "师父"},
+    {"source": "魔王", "target": "魔王"},
+    {"source": "勇者", "target": "勇者"},
+    {"source": "聖女", "target": "圣女"},
+    {"source": "王国", "target": "王国"},
+    {"source": "帝国", "target": "帝国"},
+    {"source": "騎士団", "target": "骑士团"},
+    {"source": "魔法使い", "target": "魔法使"},
+    {"source": "冒険者", "target": "冒险者"},
+    {"source": "ギルド", "target": "公会"},
+    {"source": "ダンジョン", "target": "地下城"},
+    {"source": "異世界", "target": "异世界"},
+    {"source": "転生", "target": "转生"},
+    {"source": "召喚", "target": "召唤"},
+    {"source": "精霊", "target": "精灵"},
+    {"source": "魔族", "target": "魔族"},
+    {"source": "亜人", "target": "亚人"},
+    {"source": "加護", "target": "加护"},
+    {"source": "スキル", "target": "技能"}
+  ]
+}

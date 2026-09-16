@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "apothecary-diaries",
+  "title": "药屋少女的呢喃",
+  "aliases": ["薬屋のひとりごと", "薬屋"],
+  "hotwords": [],
+  "source_urls": ["https://kusuriyanohitorigoto.jp/season2/character/"],
+  "terms": [
+    {"source": "猫猫", "target": "猫猫"},
+    {"source": "壬氏", "target": "壬氏"},
+    {"source": "高順", "target": "高顺"},
+    {"source": "玉葉妃", "target": "玉叶妃"},
+    {"source": "梨花妃", "target": "梨花妃"},
+    {"source": "里樹妃", "target": "里树妃"},
+    {"source": "阿多妃", "target": "阿多妃"},
+    {"source": "羅漢", "target": "罗汉"},
+    {"source": "羅門", "target": "罗门"},
+    {"source": "小蘭", "target": "小兰"},
+    {"source": "子翠", "target": "子翠"},
+    {"source": "翠苓", "target": "翠苓"},
+    {"source": "楼蘭妃", "target": "楼兰妃"},
+    {"source": "後宮", "target": "后宫"},
+    {"source": "薬屋", "target": "药师"},
+    {"source": "園遊会", "target": "游园会"},
+    {"source": "毒見役", "target": "试毒人"},
+    {"source": "医官", "target": "医官"},
+    {"source": "宦官", "target": "宦官"}
+  ]
+}

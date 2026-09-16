@@ -4,13 +4,14 @@ import queue
 import threading
 import traceback
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from PySide6 import QtCore
 
 from .asr import create_recognizer
 from .audio import SystemAudioCapture
 from .config import AppConfig
+from .lexicon import LexiconBundle, build_lexicon_bundle
 from .segmenter import AudioSegment, SpeechSegmenter
 from .text import TranscriptStabilizer
 from .translation import create_translator
@@ -52,6 +53,8 @@ class SubtitlePipeline(QtCore.QObject):
         self._translation_queue: queue.Queue[TranslationJob | None] = queue.Queue(
             maxsize=8
         )
+        self._lexicon_lock = threading.Lock()
+        self._lexicon_bundle: LexiconBundle | None = None
         self._threads: list[threading.Thread] = []
 
     def start(self) -> None:
@@ -100,7 +103,11 @@ class SubtitlePipeline(QtCore.QObject):
     def _asr_worker(self) -> None:
         try:
             self.status_changed.emit("正在加载语音模型…")
-            recognizer = create_recognizer(self._config.recognition)
+            lexicon = self._get_lexicon_bundle()
+            recognition_config = replace(
+                self._config.recognition, hotwords=lexicon.hotwords
+            )
+            recognizer = create_recognizer(recognition_config)
             if self._stop_event.is_set():
                 return
             self.status_changed.emit(
@@ -167,11 +174,12 @@ class SubtitlePipeline(QtCore.QObject):
 
     def _translation_worker(self) -> None:
         try:
+            lexicon = self._get_lexicon_bundle()
             translator = create_translator(
                 self._config.translation.backend,
                 self._config.translation.packages_dir,
                 self._config.translation.model_path,
-                self._config.translation.glossary,
+                lexicon.glossary,
                 self._config.translation.n_gpu_layers,
                 self._config.translation.api_base,
                 self._config.translation.api_model,
@@ -235,6 +243,16 @@ class SubtitlePipeline(QtCore.QObject):
             )
             if job.is_final and self._config.translation.context_lines:
                 context.append((job.text, previous))
+
+    def _get_lexicon_bundle(self) -> LexiconBundle:
+        with self._lexicon_lock:
+            if self._lexicon_bundle is None:
+                self._lexicon_bundle = build_lexicon_bundle(
+                    self._config.lexicon,
+                    self._config.recognition.hotwords,
+                    self._config.translation.glossary,
+                )
+            return self._lexicon_bundle
 
     def _enqueue_asr(self, segment: AudioSegment) -> None:
         if segment.is_final:

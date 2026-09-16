@@ -47,6 +47,13 @@ class TranslationConfig:
 
 
 @dataclass
+class LexiconConfig:
+    directory: str = "lexicons"
+    profile: str = ""
+    include_common: bool = True
+
+
+@dataclass
 class OverlayConfig:
     font_size: int = 24
     opacity: float = 0.82
@@ -60,6 +67,7 @@ class AppConfig:
     audio: AudioConfig = field(default_factory=AudioConfig)
     recognition: RecognitionConfig = field(default_factory=RecognitionConfig)
     translation: TranslationConfig = field(default_factory=TranslationConfig)
+    lexicon: LexiconConfig = field(default_factory=LexiconConfig)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
 
     @classmethod
@@ -76,6 +84,7 @@ class AppConfig:
                 audio=_load_section(AudioConfig, raw.get("audio")),
                 recognition=_load_section(RecognitionConfig, raw.get("recognition")),
                 translation=_load_section(TranslationConfig, raw.get("translation")),
+                lexicon=_load_section(LexiconConfig, raw.get("lexicon")),
                 overlay=_load_section(OverlayConfig, raw.get("overlay")),
             )
         config.validate()
@@ -139,6 +148,18 @@ class AppConfig:
         if not 1 <= translation.timeout_sec <= 120:
             raise ValueError("translation.timeout_sec 必须在 1 到 120 之间")
 
+        lexicon = self.lexicon
+        if not lexicon.directory.strip():
+            raise ValueError("lexicon.directory 不能为空")
+        allowed_profile_characters = frozenset(
+            "abcdefghijklmnopqrstuvwxyz0123456789-"
+        )
+        if lexicon.profile and any(
+            character not in allowed_profile_characters
+            for character in lexicon.profile
+        ):
+            raise ValueError("lexicon.profile 只能包含小写字母、数字和连字符")
+
         overlay = self.overlay
         if not 12 <= overlay.font_size <= 72:
             raise ValueError("overlay.font_size 必须在 12 到 72 之间")
@@ -151,7 +172,12 @@ class AppConfig:
 
 
 SectionType = TypeVar(
-    "SectionType", AudioConfig, RecognitionConfig, TranslationConfig, OverlayConfig
+    "SectionType",
+    AudioConfig,
+    RecognitionConfig,
+    TranslationConfig,
+    LexiconConfig,
+    OverlayConfig,
 )
 
 

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "frieren",
+  "title": "葬送的芙莉莲",
+  "aliases": ["葬送のフリーレン", "フリーレン"],
+  "hotwords": [],
+  "source_urls": ["https://frieren-anime.jp/character/"],
+  "terms": [
+    {"source": "フリーレン", "target": "芙莉莲"},
+    {"source": "フェルン", "target": "菲伦"},
+    {"source": "シュタルク", "target": "休塔尔克"},
+    {"source": "ヒンメル", "target": "辛美尔"},
+    {"source": "ハイター", "target": "海塔"},
+    {"source": "アイゼン", "target": "艾泽"},
+    {"source": "アウラ", "target": "阿乌拉"},
+    {"source": "ザイン", "target": "赞因"},
+    {"source": "デンケン", "target": "邓肯"},
+    {"source": "ユーベル", "target": "尤蓓尔"},
+    {"source": "ラント", "target": "兰特"},
+    {"source": "ラオフェン", "target": "拉欧芬"},
+    {"source": "ゼーリエ", "target": "赛莉耶"},
+    {"source": "フランメ", "target": "弗兰梅"},
+    {"source": "マハト", "target": "马哈特"},
+    {"source": "黄金郷", "target": "黄金乡"},
+    {"source": "魔法協会", "target": "魔法协会"},
+    {"source": "一級魔法使い", "target": "一级魔法使"},
+    {"source": "七崩賢", "target": "七崩贤"},
+    {"source": "断頭台のアウラ", "target": "断头台阿乌拉"}
+  ]
+}
