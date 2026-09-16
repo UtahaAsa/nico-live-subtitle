@@ -8,6 +8,7 @@ from nico_live_subtitle.translation import (
     LocalLlmTranslator,
     OpenAICompatibleTranslator,
     build_hunyuan_prompt,
+    build_translation_system_prompt,
     clean_llm_output,
 )
 
@@ -113,6 +114,11 @@ class HunyuanTranslatorTest(unittest.TestCase):
         translated = translator.translate("こんにちは")
         self.assertEqual("兼容接口译文", translated)
         self.assertEqual("local-model", calls[0]["model"])
+
+    def test_live_prompt_accepts_japanese_and_english_speech(self) -> None:
+        prompt = build_translation_system_prompt("stream=直播", "live")
+        self.assertIn("日语或英语口语", prompt)
+        self.assertIn("stream 必须译为 直播", prompt)
 
 
 if __name__ == "__main__":

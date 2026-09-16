@@ -8,11 +8,12 @@ from dataclasses import dataclass, replace
 
 from PySide6 import QtCore
 
-from .asr import create_recognizer
+from .asr import create_live_recognizer, create_recognizer
 from .audio import SystemAudioCapture
 from .config import AppConfig
-from .lexicon import LexiconBundle, build_lexicon_bundle
+from .lexicon import LexiconBundle, build_lexicon_bundle, load_lexicon_catalog
 from .segmenter import AudioSegment, SpeechSegmenter
+from .source_context import SourceContext, detect_source_context
 from .text import TranscriptStabilizer
 from .translation import create_translator
 
@@ -55,6 +56,8 @@ class SubtitlePipeline(QtCore.QObject):
         )
         self._lexicon_lock = threading.Lock()
         self._lexicon_bundle: LexiconBundle | None = None
+        self._source_context_lock = threading.Lock()
+        self._source_context: SourceContext | None = None
         self._threads: list[threading.Thread] = []
 
     def start(self) -> None:
@@ -103,15 +106,20 @@ class SubtitlePipeline(QtCore.QObject):
     def _asr_worker(self) -> None:
         try:
             self.status_changed.emit("正在加载语音模型…")
+            source_context = self._get_source_context()
             lexicon = self._get_lexicon_bundle()
             recognition_config = replace(
                 self._config.recognition, hotwords=lexicon.hotwords
             )
-            recognizer = create_recognizer(recognition_config)
+            if source_context.kind == "live":
+                recognizer = create_live_recognizer(recognition_config)
+            else:
+                recognizer = create_recognizer(recognition_config)
             if self._stop_event.is_set():
                 return
             self.status_changed.emit(
-                f"语音模型就绪：{recognizer.runtime.device} / "
+                f"语音模型就绪：{source_context.label} / "
+                f"{recognizer.runtime.device} / "
                 f"{recognizer.runtime.compute_type}"
             )
         except Exception as error:
@@ -133,7 +141,7 @@ class SubtitlePipeline(QtCore.QObject):
             try:
                 text = recognizer.transcribe(segment.samples)
             except Exception as error:
-                self._emit_failure("日语识别失败", error)
+                self._emit_failure("语音识别失败", error)
                 continue
             if recognizer.runtime != previous_runtime:
                 self.status_changed.emit(
@@ -174,6 +182,7 @@ class SubtitlePipeline(QtCore.QObject):
 
     def _translation_worker(self) -> None:
         try:
+            source_context = self._get_source_context()
             lexicon = self._get_lexicon_bundle()
             translator = create_translator(
                 self._config.translation.backend,
@@ -185,6 +194,7 @@ class SubtitlePipeline(QtCore.QObject):
                 self._config.translation.api_model,
                 self._config.translation.api_key_env,
                 self._config.translation.timeout_sec,
+                source_context.kind,
             )
             if self._stop_event.is_set():
                 return
@@ -234,7 +244,7 @@ class SubtitlePipeline(QtCore.QObject):
                 if not previous:
                     raise RuntimeError("翻译后端返回了空结果")
             except Exception as error:
-                self._emit_failure("翻译失败，日语识别仍会继续", error)
+                self._emit_failure("翻译失败，语音识别仍会继续", error)
                 continue
             self.translation_ready.emit(
                 TranslationUpdate(
@@ -247,12 +257,28 @@ class SubtitlePipeline(QtCore.QObject):
     def _get_lexicon_bundle(self) -> LexiconBundle:
         with self._lexicon_lock:
             if self._lexicon_bundle is None:
+                source_context = self._get_source_context()
+                lexicon_config = replace(
+                    self._config.lexicon, profile=source_context.profile
+                )
                 self._lexicon_bundle = build_lexicon_bundle(
-                    self._config.lexicon,
+                    lexicon_config,
                     self._config.recognition.hotwords,
                     self._config.translation.glossary,
+                    "live-common"
+                    if source_context.kind == "live"
+                    else "anime-common",
                 )
             return self._lexicon_bundle
+
+    def _get_source_context(self) -> SourceContext:
+        with self._source_context_lock:
+            if self._source_context is None:
+                catalog = load_lexicon_catalog(self._config.lexicon.directory)
+                self._source_context = detect_source_context(
+                    self._config.lexicon, catalog
+                )
+            return self._source_context
 
     def _enqueue_asr(self, segment: AudioSegment) -> None:
         if segment.is_final:

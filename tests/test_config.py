@@ -51,6 +51,12 @@ class AppConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "context_lines"):
             config.validate()
 
+    def test_live_model_must_not_be_empty(self) -> None:
+        config = AppConfig()
+        config.recognition.live_model = ""
+        with self.assertRaisesRegex(ValueError, "live_model"):
+            config.validate()
+
     def test_silero_requires_32_ms_blocks(self) -> None:
         config = AppConfig()
         config.audio.vad_mode = "silero"

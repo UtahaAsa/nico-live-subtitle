@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nico-live-subtitle"
-version = "0.3.0"
-description = "Windows system-audio Japanese subtitles with Chinese translation overlay"
+version = "0.4.0"
+description = "Windows system-audio Japanese and English subtitles with Chinese translation overlay"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-keywords = ["subtitle", "whisper", "japanese", "translation", "wasapi"]
+keywords = ["subtitle", "whisper", "japanese", "english", "translation", "wasapi"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: MIT License",

@@ -35,6 +35,16 @@ class AnimeLexiconTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "schema_version"):
                 load_lexicon_catalog(directory)
 
+    def test_live_bundle_uses_live_terms_without_anime_terms(self) -> None:
+        bundle = build_lexicon_bundle(
+            LexiconConfig(profile=""), base_lexicon_id="live-common"
+        )
+
+        self.assertEqual("通用直播", bundle.title)
+        self.assertIn("ゆっくりしていってね=慢慢看，别急着走", bundle.glossary)
+        self.assertIn("collab=联动", bundle.glossary)
+        self.assertNotIn("異世界=异世界", bundle.glossary)
+
 
 if __name__ == "__main__":
     unittest.main()

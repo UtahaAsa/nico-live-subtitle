@@ -30,6 +30,7 @@ class RecognitionConfig:
     compute_type: str = "auto"
     beam_size: int = 1
     hotwords: str = ""
+    live_model: str = "openai/whisper-large-v3-turbo"
 
 
 @dataclass
@@ -49,7 +50,7 @@ class TranslationConfig:
 @dataclass
 class LexiconConfig:
     directory: str = "lexicons"
-    profile: str = ""
+    profile: str = "auto"
     include_common: bool = True
 
 
@@ -127,6 +128,10 @@ class AppConfig:
             raise ValueError("recognition.device 只能是 auto、cpu 或 cuda")
         if recognition.beam_size < 1:
             raise ValueError("recognition.beam_size 必须大于等于 1")
+        if not recognition.model.strip():
+            raise ValueError("recognition.model 不能为空")
+        if not recognition.live_model.strip():
+            raise ValueError("recognition.live_model 不能为空")
 
         translation = self.translation
         if translation.backend not in {

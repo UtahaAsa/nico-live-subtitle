@@ -46,6 +46,13 @@ class OverlayWindowTest(unittest.TestCase):
         self.assertIn("本作品", dialog.lexicon_info_label.text())
         dialog.close()
 
+    def test_settings_defaults_to_automatic_content_mode(self) -> None:
+        dialog = SettingsDialog(AppConfig())
+
+        self.assertEqual("auto", dialog.lexicon_combo.currentData())
+        self.assertIn("自动分流", dialog.lexicon_info_label.text())
+        dialog.close()
+
 
 if __name__ == "__main__":
     unittest.main()

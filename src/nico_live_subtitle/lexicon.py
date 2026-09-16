@@ -54,16 +54,17 @@ def build_lexicon_bundle(
     config: LexiconConfig,
     custom_hotwords: str = "",
     custom_glossary: str = "",
+    base_lexicon_id: str = "anime-common",
 ) -> LexiconBundle:
     catalog = {item.id: item for item in load_lexicon_catalog(config.directory)}
     selected: list[AnimeLexicon] = []
-    if config.include_common and "anime-common" in catalog:
-        selected.append(catalog["anime-common"])
+    if config.include_common and base_lexicon_id in catalog:
+        selected.append(catalog[base_lexicon_id])
     if config.profile:
         profile = catalog.get(config.profile)
         if profile is None:
             raise ValueError(f"找不到作品词库：{config.profile}")
-        if profile.id != "anime-common":
+        if profile.id != base_lexicon_id:
             selected.append(profile)
 
     hotwords: dict[str, None] = {}
@@ -85,8 +86,8 @@ def build_lexicon_bundle(
         terms[source] = target
 
     profile_title = next(
-        (item.title for item in selected if item.id != "anime-common"),
-        "通用动画",
+        (item.title for item in selected if item.id != base_lexicon_id),
+        "通用直播" if base_lexicon_id == "live-common" else "通用动画",
     )
     return LexiconBundle(
         title=profile_title,

@@ -39,6 +39,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.asr_engine_combo.setCurrentIndex(max(0, asr_index))
         self.model_edit = QtWidgets.QLineEdit(config.recognition.model)
         self.model_edit.setPlaceholderText("例如 small，或本地 CTranslate2 模型目录")
+        self.live_model_edit = QtWidgets.QLineEdit(config.recognition.live_model)
+        self.live_model_edit.setPlaceholderText(
+            "例如 work/models/whisper-large-v3-turbo"
+        )
         self.runtime_combo = QtWidgets.QComboBox()
         self.runtime_combo.addItems(["auto", "cpu", "cuda"])
         self.runtime_combo.setCurrentText(config.recognition.device)
@@ -155,10 +159,11 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("Silero VAD 模型", self.silero_model_edit)
         form.addRow("VAD 语音阈值", self.vad_threshold_spin)
         form.addRow("识别引擎", self.asr_engine_combo)
-        form.addRow("语音模型", self.model_edit)
+        form.addRow("动画语音模型", self.model_edit)
+        form.addRow("日英直播模型", self.live_model_edit)
         form.addRow("运行设备", self.runtime_combo)
         form.addRow("计算类型", self.compute_combo)
-        form.addRow("作品词库", lexicon_row)
+        form.addRow("内容模式 / 词库", lexicon_row)
         form.addRow("词库内容", self.lexicon_info_label)
         form.addRow("自定义热词", self.hotwords_edit)
         form.addRow("翻译方式", self.translation_combo)
@@ -214,6 +219,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self._config.audio.partial_ms = self.partial_spin.value()
         self._config.recognition.engine = str(self.asr_engine_combo.currentData())
         self._config.recognition.model = self.model_edit.text().strip()
+        self._config.recognition.live_model = self.live_model_edit.text().strip()
         self._config.recognition.device = self.runtime_combo.currentText()
         self._config.recognition.compute_type = self.compute_combo.currentText()
         self._config.recognition.hotwords = self.hotwords_edit.text().strip()
@@ -259,7 +265,9 @@ class SettingsDialog(QtWidgets.QDialog):
         )
         self.lexicon_combo.clear()
         self._lexicons = {}
-        self.lexicon_combo.addItem("通用动画词库", "")
+        self.lexicon_combo.addItem("自动判断（动画 / 日英直播）", "auto")
+        self.lexicon_combo.addItem("通用日英直播", "live")
+        self.lexicon_combo.addItem("通用日语动画", "")
         try:
             catalog = load_lexicon_catalog(self._config.lexicon.directory)
         except ValueError as error:
@@ -268,7 +276,7 @@ class SettingsDialog(QtWidgets.QDialog):
             return
         self._lexicons = {item.id: item for item in catalog}
         for lexicon in catalog:
-            if lexicon.id == "anime-common":
+            if lexicon.id in {"anime-common", "live-common"}:
                 continue
             self.lexicon_combo.addItem(lexicon.title, lexicon.id)
         index = self.lexicon_combo.findData(selected or "")
@@ -279,9 +287,21 @@ class SettingsDialog(QtWidgets.QDialog):
         self._update_lexicon_info()
 
     def _update_lexicon_info(self) -> None:
+        profile_id = self.lexicon_combo.currentData()
+        if profile_id == "auto":
+            self.lexicon_info_label.setText(
+                "开始时匹配窗口标题；已知作品加载专属词库，其他动画/日英直播自动分流"
+            )
+            return
         common = self._lexicons.get("anime-common")
         common_count = len(common.terms) if common is not None else 0
-        profile_id = self.lexicon_combo.currentData()
+        if profile_id == "live":
+            live = self._lexicons.get("live-common")
+            live_count = len(live.terms) if live is not None else 0
+            self.lexicon_info_label.setText(
+                f"日语/英语自动识别，附带 {live_count} 条直播口语固定译法"
+            )
+            return
         profile = self._lexicons.get(str(profile_id)) if profile_id else None
         profile_count = len(profile.terms) if profile is not None else 0
         if profile_id is None and self.lexicon_combo.currentIndex() > 0:
@@ -294,7 +314,10 @@ class SettingsDialog(QtWidgets.QDialog):
 
     def _validate_and_accept(self) -> None:
         if not self.model_edit.text().strip():
-            QtWidgets.QMessageBox.warning(self, "设置错误", "Whisper 模型不能为空")
+            QtWidgets.QMessageBox.warning(self, "设置错误", "动画语音模型不能为空")
+            return
+        if not self.live_model_edit.text().strip():
+            QtWidgets.QMessageBox.warning(self, "设置错误", "日英直播模型不能为空")
             return
         if self.device_combo.currentData() == "":
             QtWidgets.QMessageBox.warning(self, "设置错误", "请先选择有效音频设备")
@@ -303,7 +326,9 @@ class SettingsDialog(QtWidgets.QDialog):
             self.lexicon_combo.currentText(), QtCore.Qt.MatchFlag.MatchFixedString
         )
         if lexicon_index < 0 or self.lexicon_combo.itemData(lexicon_index) is None:
-            QtWidgets.QMessageBox.warning(self, "设置错误", "请选择有效的作品词库")
+            QtWidgets.QMessageBox.warning(
+                self, "设置错误", "请选择有效的内容模式 / 词库"
+            )
             return
         self.lexicon_combo.setCurrentIndex(lexicon_index)
         if (
@@ -344,7 +369,7 @@ class OverlayWindow(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
 
         self.card = QtWidgets.QFrame()
-        self.japanese_label = QtWidgets.QLabel("播放日语视频后点击“开始”")
+        self.japanese_label = QtWidgets.QLabel("播放动画或日英直播后点击“开始”")
         self.chinese_label = QtWidgets.QLabel("中文字幕将在这里显示")
         for label in (self.japanese_label, self.chinese_label):
             label.setWordWrap(True)
@@ -506,7 +531,7 @@ class OverlayWindow(QtWidgets.QWidget):
     def _render_lines(self) -> None:
         japanese = "\n".join(line.japanese for line in self._lines.values())
         chinese = "\n".join(line.chinese for line in self._lines.values() if line.chinese)
-        self.japanese_label.setText(japanese or "正在等待日语语音…")
+        self.japanese_label.setText(japanese or "正在等待日语或英语语音…")
         if self._config.translation.backend == "none":
             self.chinese_label.hide()
         else:

@@ -1,20 +1,21 @@
 # Nico Live Subtitle
 
-Windows 桌面实时字幕 MVP：捕获默认播放设备的系统音频，识别日语，并在置顶透明窗口中显示日文原文和中文翻译。它不读取 niconico 页面，也不会处理或遮挡弹幕数据，因此同样适用于浏览器、播放器和游戏。
+Windows 桌面实时字幕 MVP：捕获默认播放设备的系统音频，识别动画日语或日英直播口语，并在置顶透明窗口中显示原文和中文翻译。它不读取页面内容，也不会处理或遮挡弹幕数据，因此同样适用于浏览器、播放器和游戏。
 
 > 当前状态：Alpha。纯逻辑测试、Windows 回环采集以及本地模型组件烟测已通过，但仍需更多 niconico 实际片段验证识别和翻译质量。
 
 ## 功能
 
 - Windows WASAPI 回环录音，不使用麦克风
-- Anime-Whisper 动画日语识别，也可切回 `faster-whisper`
+- 启动时按窗口标题自动区分动画与日英直播，无需每部作品手动切换
+- Anime-Whisper 动画日语识别；Whisper large-v3-turbo 日英直播自动识别
 - Silero 神经网络 VAD、动态停顿切句、长句低置信度位置切分
 - 仅翻译已经稳定的完整句，避免临时识别结果反复改写译文
 - 本地 Qwen、OpenAI 兼容接口、HY-MT、Google、Argos 多种翻译后端
-- LLM 流式翻译、日中成对上下文和动画专用提示词
+- LLM 流式翻译、上下文以及动画/直播各自的翻译提示词
 - 可搜索的作品词库包，自动叠加角色名、地名、招式和固定译名
 - 透明置顶悬浮窗、字号/透明度调整、点击穿透
-- 音频设备枚举、自定义 Whisper 模型路径、日语热词
+- 音频设备枚举、分别配置动画/直播 Whisper 模型、自定义识别热词
 
 ## 安装
 
@@ -47,7 +48,9 @@ nico-live-subtitle --config .\config.example.json
 nico-live-subtitle --list-devices
 ```
 
-启动后先播放一段日语视频，再点击“开始”。字幕窗口可以拖动；右键或托盘菜单可以开关点击穿透。开启点击穿透后，请通过系统托盘菜单恢复交互。
+启动后先打开视频或直播，再点击“开始”。默认“自动判断”会检查当时可见的窗口标题：命中内置作品时使用该作品词库；未收录但标题带有动画、集数或视频网站特征时使用通用动画模式；其余内容使用日英直播模式。窗口标题只在本机内存中用于判断，不保存、不上传。
+
+字幕窗口可以拖动；右键或托盘菜单可以开关点击穿透。开启点击穿透后，请通过系统托盘菜单恢复交互。如果运行中从动画切换到直播（或反过来），请点一次“停止”再点“开始”，让程序重新判断并加载对应模型。
 
 ## 识别与切句
 
@@ -57,7 +60,7 @@ nico-live-subtitle --list-devices
 | 较新的桌面 CPU | `small` | `cpu` | `int8` |
 | NVIDIA 显卡 | `small` / `medium` | `cuda` | `float16` |
 
-看动画推荐使用 `anime_whisper` 和 Silero VAD。Anime-Whisper 针对动画、Galgame 式演技日语微调；该模型不适合 `initial_prompt`，因此程序不会向它传递日语热词。Silero 模式固定使用 32ms 音频块，通过神经网络概率判断语音，并随台词变长逐步缩短停顿阈值。
+看动画推荐使用 `anime_whisper` 和 Silero VAD。Anime-Whisper 针对动画、Galgame 式演技日语微调；该模型不适合 `initial_prompt`，因此程序不会向它传递日语热词。日英直播模式使用 OpenAI 的多语言 Whisper large-v3-turbo，不固定输入语言，由模型自动判断日语或英语。Silero 模式固定使用 32ms 音频块，通过神经网络概率判断语音，并随台词变长逐步缩短停顿阈值。
 
 在 Windows + NVIDIA 显卡上的参考安装命令：
 
@@ -65,13 +68,16 @@ nico-live-subtitle --list-devices
 python -m pip install --index-url https://download.pytorch.org/whl/cu130 torch==2.14.0+cu130
 python -m pip install -e ".[anime-asr]"
 python -c "from huggingface_hub import snapshot_download; snapshot_download('litagin/anime-whisper', local_dir='work/models/anime-whisper')"
+python -c "from huggingface_hub import snapshot_download; snapshot_download('openai/whisper-large-v3-turbo', local_dir='work/models/whisper-large-v3-turbo')"
 New-Item -ItemType Directory -Force work/models/silero-vad
 Invoke-WebRequest https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad.jit -OutFile work/models/silero-vad/silero_vad.jit
 ```
 
-## 作品词库
+在设置中，“动画语音模型”和“日英直播模型”可分别填写本地目录；当前内容模式不会加载另一个模型。没有预先下载时，也可以保留 Hugging Face 模型名，首次使用时在线缓存。
 
-设置中的“作品词库”代替了不断增长的单行热词和术语表。程序始终加载 `anime-common` 通用词库，再叠加当前选择的一部作品；“自定义热词”和“自定义术语”只用于少量个人修正，并且自定义译名优先于内置译名。
+## 内容模式与词库
+
+设置中的“内容模式 / 词库”代替了不断增长的单行热词和术语表。默认保持“自动判断”，不需要每次选择作品：程序会先尝试匹配作品标题，命中后自动叠加 `anime-common` 与对应作品包；无法匹配的动画使用通用动画词库，直播使用独立的 `live-common` 日英直播词库。“自定义热词”和“自定义术语”只用于少量个人修正，并且自定义译名优先于内置译名。
 
 当前内置：
 
@@ -105,9 +111,9 @@ Anime-Whisper 不直接接收热词，作品词库会进入 LLM 提示词，用�
 - `google`：默认，依赖网络，使用 `deep-translator`；第三方服务变化或网络限制可能导致翻译失败。
 - `hunyuan`：轻量离线方案，使用 HY-MT1.5-1.8B GGUF 直接日译中。
 - `argos`：轻量离线方案，需要额外安装 `argostranslate`。当前官方索引没有日语到中文直连包，只能由日语到英语、英语到中文两个包组合翻译，因此质量通常低于 HY-MT；`packages_dir` 用于指定语言包目录。
-- `none`：只显示日文原文，用于离线识别或排查性能问题。
+- `none`：只显示识别原文，用于离线识别或排查性能问题。
 
-在线翻译失败不会中断日语识别，状态栏会显示错误。软件不会保存音频和字幕历史。
+在线翻译失败不会中断语音识别，状态栏会显示错误。软件不会保存音频和字幕历史。
 
 ### 安装本地 Qwen 翻译
 
@@ -124,13 +130,14 @@ python -c "from huggingface_hub import hf_hub_download; hf_hub_download('Qwen/Qw
 work/models/qwen3-4b/Qwen3-4B-Q4_K_M.gguf
 ```
 
-`context_lines` 控制携带多少组历史日文及其中文译文；`n_gpu_layers=-1` 表示尽量把全部层放到 GPU。Qwen3 和 Anime-Whisper 均使用 MIT/Apache-2.0 兼容的开放许可，但模型权重仍不包含在本仓库中。
+`context_lines` 控制携带多少组历史原文及其中文译文；`n_gpu_layers=-1` 表示尽量把全部层放到 GPU。Qwen3 和 Anime-Whisper 均使用 MIT/Apache-2.0 兼容的开放许可，但模型权重仍不包含在本仓库中。
 
 HY-MT 仍作为兼容后端保留。它采用独立的 Tencent HY Community License，许可地域不包括欧盟、英国和韩国；使用前请阅读[模型仓库的完整许可](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/blob/main/License.txt)。
 
 ## 已知边界
 
-- 动画配乐、角色重叠说话仍会降低识别质量；Anime-Whisper 不使用热词，角色译名请配置在翻译术语表中。
+- 自动模式依赖窗口标题，只在每次点击“开始”时判断一次；标题信息不足或分类不正确时，可手动选择“通用日英直播”“通用日语动画”或具体作品。
+- 动画配乐、角色重叠说话以及直播多人抢话仍会降低识别质量；Anime-Whisper 不使用热词，角色译名请配置在翻译术语表中。
 - Anime-Whisper 与本地 LLM 会同时占用显存；显存不足时可减少 `n_gpu_layers`，把一部分翻译模型放到 CPU。
 - 本地 LLM 首次翻译需要 Vulkan 着色器预热，之后延迟会明显降低。4B 模型仍可能误译；质量要求更高时应使用 `openai_compatible` 后端连接更强模型。
 - WASAPI 默认采集整个默认播放设备，而不是只采集 Chrome。系统通知和其他应用声音也会进入识别。
@@ -151,6 +158,7 @@ python -m unittest discover -s tests -v
 
 - [LiveTranslate](https://github.com/TheDeathDragon/LiveTranslate)：Anime-Whisper、Silero VAD、稳定句提交、上下文 LLM 翻译等整体思路。
 - [AutoTranslation](https://github.com/felenko/AutoTranslation)：跨片段文本去重与音频边界处理思路。
+- [OpenAI Whisper](https://github.com/openai/whisper) / [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo)：日英直播多语言识别模型与用法。
 
 本项目没有直接打包上述项目的源码或模型；具体实现保持在本仓库内，并遵循各上游项目和模型各自的许可证。
 

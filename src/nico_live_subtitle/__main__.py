@@ -9,7 +9,7 @@ from .config import AppConfig
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Windows 系统音频日语识别与中文翻译悬浮字幕"
+        description="Windows 系统音频日英识别与中文翻译悬浮字幕"
     )
     parser.add_argument("--config", type=Path, help="JSON 配置文件路径")
     parser.add_argument(
@@ -61,4 +61,3 @@ def _print_devices() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -153,6 +153,7 @@ class LocalLlmTranslator:
         glossary: str = "",
         n_gpu_layers: int = -1,
         model_factory: Callable[..., Any] | None = None,
+        domain: str = "anime",
     ) -> None:
         if not model_path:
             raise RuntimeError("本地 LLM 模型路径不能为空")
@@ -174,7 +175,7 @@ class LocalLlmTranslator:
             n_gpu_layers=n_gpu_layers,
             verbose=False,
         )
-        self._system_prompt = build_anime_system_prompt(glossary)
+        self._system_prompt = build_translation_system_prompt(glossary, domain)
 
     def warmup(self) -> None:
         self._model.create_chat_completion(
@@ -236,6 +237,7 @@ class OpenAICompatibleTranslator:
         glossary: str = "",
         timeout_sec: int = 20,
         client_factory: Callable[..., Any] | None = None,
+        domain: str = "anime",
     ) -> None:
         if not api_base.strip() or not model.strip():
             raise RuntimeError("OpenAI 兼容接口地址和模型名称不能为空")
@@ -257,7 +259,7 @@ class OpenAICompatibleTranslator:
             timeout=timeout_sec,
         )
         self._model = model
-        self._system_prompt = build_anime_system_prompt(glossary)
+        self._system_prompt = build_translation_system_prompt(glossary, domain)
 
     def translate(
         self, text: str, context: Sequence[TranslationContext] = ()
@@ -307,11 +309,25 @@ class OpenAICompatibleTranslator:
 
 
 def build_anime_system_prompt(glossary: str = "") -> str:
-    prompt = (
-        "你是实时动画字幕翻译器。把日语台词翻译成自然、简洁、符合人物语气的"
-        "简体中文。结合对话前文修正明显的语音识别错误。只输出当前台词的一种"
-        "最佳译文，不解释、不提供备选、不输出思考过程。"
-    )
+    return build_translation_system_prompt(glossary, "anime")
+
+
+def build_translation_system_prompt(
+    glossary: str = "", domain: str = "anime"
+) -> str:
+    if domain == "live":
+        prompt = (
+            "你是实时直播字幕翻译器。输入是日语或英语口语，翻译成自然、简洁的"
+            "简体中文。保留主播语气、网络用语、人名和游戏名，并结合对话前文修正"
+            "明显的语音识别错误。只输出当前话语的一种最佳译文，不解释、不提供"
+            "备选、不输出思考过程。"
+        )
+    else:
+        prompt = (
+            "你是实时动画字幕翻译器。把日语台词翻译成自然、简洁、符合人物语气的"
+            "简体中文。结合对话前文修正明显的语音识别错误。只输出当前台词的一种"
+            "最佳译文，不解释、不提供备选、不输出思考过程。"
+        )
     terms = _parse_glossary(glossary)
     if terms:
         term_lines = "；".join(f"{source} 必须译为 {target}" for source, target in terms)
@@ -365,6 +381,7 @@ def create_translator(
     api_model: str = "qwen3:8b",
     api_key_env: str = "NICO_SUBTITLE_API_KEY",
     timeout_sec: int = 20,
+    domain: str = "anime",
 ) -> Translator:
     if backend == "none":
         return NoopTranslator()
@@ -375,9 +392,16 @@ def create_translator(
     if backend == "hunyuan":
         return HunyuanTranslator(model_path, glossary, n_gpu_layers)
     if backend == "local_llm":
-        return LocalLlmTranslator(model_path, glossary, n_gpu_layers)
+        return LocalLlmTranslator(
+            model_path, glossary, n_gpu_layers, domain=domain
+        )
     if backend == "openai_compatible":
         return OpenAICompatibleTranslator(
-            api_base, api_model, api_key_env, glossary, timeout_sec
+            api_base,
+            api_model,
+            api_key_env,
+            glossary,
+            timeout_sec,
+            domain=domain,
         )
     raise ValueError(f"不支持的翻译后端：{backend}")

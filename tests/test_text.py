@@ -34,6 +34,20 @@ class JapaneseSentenceTest(unittest.TestCase):
         complete, _ = stabilizer.push("今日はとってもいい天気です。次です。", True)
         self.assertEqual(["次です。"], complete)
 
+    def test_english_period_commits_before_unstable_tail(self) -> None:
+        stabilizer = TranscriptStabilizer()
+        complete, pending = stabilizer.push(
+            "Thanks for joining. Today we're playing", False
+        )
+        self.assertEqual(["Thanks for joining."], complete)
+        self.assertEqual("Today we're playing", pending)
+
+    def test_english_abbreviation_is_not_split(self) -> None:
+        self.assertEqual(
+            ["Dr. Smith is here.", "Welcome!"],
+            split_japanese_sentences("Dr. Smith is here. Welcome!"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

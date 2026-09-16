@@ -19,7 +19,8 @@
     "device": "auto",
     "compute_type": "auto",
     "beam_size": 1,
-    "hotwords": ""
+    "hotwords": "",
+    "live_model": "openai/whisper-large-v3-turbo"
   },
   "translation": {
     "backend": "google",
@@ -35,7 +36,7 @@
   },
   "lexicon": {
     "directory": "lexicons",
-    "profile": "",
+    "profile": "auto",
     "include_common": true
   },
   "overlay": {
