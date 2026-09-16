@@ -353,7 +353,7 @@ class OverlayWindow(QtWidgets.QWidget):
         if was_running:
             self.stop_pipeline()
         self._apply_overlay_style()
-        self.resize(self._config.overlay.width, self.height())
+        self._resize_to_content_preserving_anchor()
         self._trim_lines()
         self._render_lines()
         if was_running:
@@ -435,8 +435,27 @@ class OverlayWindow(QtWidgets.QWidget):
         else:
             self.chinese_label.show()
             self.chinese_label.setText(chinese or "正在等待翻译…")
-        self.adjustSize()
-        self.resize(self._config.overlay.width, self.height())
+        self._resize_to_content_preserving_anchor()
+
+    def _resize_to_content_preserving_anchor(self) -> None:
+        """调整字幕框高度时保持用户拖动后的底部中心位置不变。"""
+        current = self.frameGeometry()
+        anchor_x = current.center().x()
+        anchor_y = current.bottom()
+        target_width = self._config.overlay.width
+
+        layout = self.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+        target_height = self.heightForWidth(target_width)
+        if target_height < 0:
+            target_height = self.sizeHint().height()
+        self.resize(target_width, max(1, target_height))
+        self.move(
+            anchor_x - (self.width() - 1) // 2,
+            anchor_y - self.height() + 1,
+        )
 
     def _apply_overlay_style(self) -> None:
         alpha = round(self._config.overlay.opacity * 255)
